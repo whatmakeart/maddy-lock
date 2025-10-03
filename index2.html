@@ -1,214 +1,731 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Physics Login Puzzle</title>
-  <style>
-    :root {
-      --bg: #0f1220;
-      --fg: #e9ecf1;
-      --accent: #6ee7ff;
-      --good: #7CFC00;
-      --slot: #2a2f4a;
-      --slotGlow: #87a6ff88;
-    }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { position: fixed; inset: 0; display: grid; place-items: center; }
-    canvas { width: 100vw; height: 100vh; display: block; background: radial-gradient(1000px 800px at 10% 10%, #171b33, #0f1220 60%); }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Physics Login Puzzle</title>
+    <style>
+      :root {
+        --bg: #0f1220;
+        --fg: #e9ecf1;
+        --accent: #6ee7ff;
+        --good: #7cfc00;
+        --slot: #2a2f4a;
+        --slotGlow: #87a6ff88;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      }
+      .wrap {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+      }
+      canvas {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        background: radial-gradient(1000px 800px at 10% 10%, #171b33, #0f1220 60%);
+      }
 
-    .hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 16px; padding: 10px 16px; pointer-events: none; }
-    .hud .pill { pointer-events: auto; background: #1b2038; border: 1px solid #2b3156; border-radius: 999px; padding: 8px 14px; box-shadow: 0 6px 22px #0007; }
-    .hud .title { font-weight: 700; letter-spacing: 0.3px; }
-    .btn { cursor: pointer; user-select: none; transition: transform .06s ease; }
-    .btn:active { transform: translateY(1px); }
+      .hud {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 10px 16px;
+        pointer-events: none;
+      }
+      .hud .pill {
+        pointer-events: auto;
+        background: #1b2038;
+        border: 1px solid #2b3156;
+        border-radius: 999px;
+        padding: 8px 14px;
+        box-shadow: 0 6px 22px #0007;
+      }
+      .hud .title {
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+      .btn {
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.06s ease;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
 
-    .overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; }
-    .card { max-width: 900px; width: min(90vw, 980px); background: #11152aee; border: 1px solid #2b3156; box-shadow: 0 30px 100px #000e; border-radius: 20px; padding: 22px; backdrop-filter: blur(6px); }
-    .card h1 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 34px); }
-    .card p { opacity: .88; margin: 0 0 14px; line-height: 1.45; }
-    .goals { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-    .goalSlot { width: 54px; height: 54px; border-radius: 12px; background: var(--slot); border: 2px dashed #3a416f; outline: 4px solid transparent; box-shadow: inset 0 0 0 1px #00000055, 0 0 16px #0000; display: grid; place-items: center; }
-    .goalSlot.ready { outline-color: var(--slotGlow); box-shadow: 0 0 24px var(--slotGlow); }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 900px;
+        width: min(90vw, 980px);
+        background: #11152aee;
+        border: 1px solid #2b3156;
+        box-shadow: 0 30px 100px #000e;
+        border-radius: 20px;
+        padding: 22px;
+        backdrop-filter: blur(6px);
+      }
+      .card h1 {
+        margin: 0 0 8px;
+        font-size: clamp(22px, 3vw, 34px);
+      }
+      .card p {
+        opacity: 0.88;
+        margin: 0 0 14px;
+        line-height: 1.45;
+      }
+      .goals {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .goalSlot {
+        width: 54px;
+        height: 54px;
+        border-radius: 12px;
+        background: var(--slot);
+        border: 2px dashed #3a416f;
+        outline: 4px solid transparent;
+        box-shadow: inset 0 0 0 1px #00000055, 0 0 16px #0000;
+        display: grid;
+        place-items: center;
+      }
+      .goalSlot.ready {
+        outline-color: var(--slotGlow);
+        box-shadow: 0 0 24px var(--slotGlow);
+      }
 
-    .success { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: radial-gradient(1200px 800px at 50% 40%, #102532, #0a0d18 60%); }
-    .success.show { display: grid; }
-    .success h1 { font-size: clamp(40px, 12vw, 140px); margin: 0; line-height: .9; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 8px 30px #000a; }
-    .success p { font-size: clamp(16px, 2vw, 24px); opacity: .9; margin: 12px 0 0; }
+      .success {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        text-align: center;
+        background: radial-gradient(1200px 800px at 50% 40%, #102532, #0a0d18 60%);
+      }
+      .success.show {
+        display: grid;
+      }
+      .success h1 {
+        font-size: clamp(40px, 12vw, 140px);
+        margin: 0;
+        line-height: 0.9;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        text-shadow: 0 8px 30px #000a;
+      }
+      .success p {
+        font-size: clamp(16px, 2vw, 24px);
+        opacity: 0.9;
+        margin: 12px 0 0;
+      }
 
-    .loginBadge { position: fixed; bottom: 12px; right: 12px; background: #0e1a2b; border: 1px solid #2b3156; padding: 10px 14px; border-radius: 12px; box-shadow: 0 10px 30px #0008; display: none; }
-    .loginBadge.show { display: block; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0b1322; border: 1px solid #2a3156; border-bottom-color: #1c2346; padding: 2px 6px; border-radius: 6px; font-size: .95em; }
+      .loginBadge {
+        position: fixed;
+        bottom: 12px;
+        right: 12px;
+        background: #0e1a2b;
+        border: 1px solid #2b3156;
+        padding: 10px 14px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px #0008;
+        display: none;
+      }
+      .loginBadge.show {
+        display: block;
+      }
+      .kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #0b1322;
+        border: 1px solid #2a3156;
+        border-bottom-color: #1c2346;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 0.95em;
+      }
 
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-  </style>
-</head>
-<body>
-  <a class="sr-only" href="#main">Skip to content</a>
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
 
-  <div class="wrap">
-    <canvas id="scene" width="1280" height="720" aria-label="Physics puzzle canvas" role="img"></canvas>
-  </div>
+    <div class="wrap">
+      <canvas id="scene" width="1280" height="720" aria-label="Physics puzzle canvas" role="img"></canvas>
+    </div>
 
-  <div class="hud">
-    <div class="pill title">Arrange the pieces into the glowing slots → they will bounce!</div>
-    <div class="pill btn" id="resetBtn" title="Reset (R)">Reset</div>
-    <div class="pill">Tip: drag with mouse / touch, fling to nudge. Hold <span class="kbd">Shift</span> for heavy pull.</div>
-  </div>
-
-  <div class="overlay" id="intro">
-    <div class="card">
-      <h1>Verify you're human with a tiny physics puzzle</h1>
-      <p>Drag the shapes so that each <strong>glowing slot</strong> is filled. Pieces collide and bounce off each other and the walls. When every slot is satisfied, you'll be logged in automatically.</p>
-      <div class="goals" id="goalPreview" aria-hidden="true"></div>
-      <p style="margin-top:12px; opacity:.8">Complete the arrangement shown above (order doesn't matter). Have fun!</p>
-      <div style="display:flex; gap:10px; margin-top:12px">
-        <button class="pill btn" id="playBtn">Start</button>
-        <button class="pill btn" id="shuffleBtn">Shuffle pieces</button>
+    <div class="hud">
+      <div class="pill title">Arrange the pieces into the glowing slots → they will bounce!</div>
+      <div class="pill btn" id="resetBtn" title="Reset (R)">Reset</div>
+      <div class="pill">
+        Tip: drag with mouse / touch, fling to nudge. Hold
+        <span class="kbd">Shift</span>
+        for heavy pull.
       </div>
     </div>
-  </div>
 
-  <div class="success" id="success">
-    <div>
-      <h1>YOU DID IT 🎉</h1>
-      <p>Login successful. Welcome!</p>
+    <div class="overlay" id="intro">
+      <div class="card">
+        <h1>Verify you're human with a tiny physics puzzle</h1>
+        <p>
+          Drag the shapes so that each
+          <strong>glowing slot</strong>
+          is filled. Pieces collide and bounce off each other and the walls. When every slot is satisfied, you'll be
+          logged in automatically.
+        </p>
+        <div class="goals" id="goalPreview" aria-hidden="true"></div>
+        <p style="margin-top: 12px; opacity: 0.8">
+          Complete the arrangement shown above (order doesn't matter). Have fun!
+        </p>
+        <div style="display: flex; gap: 10px; margin-top: 12px">
+          <button class="pill btn" id="playBtn">Start</button>
+          <button class="pill btn" id="shuffleBtn">Shuffle pieces</button>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="loginBadge" id="loginBadge">Status: <strong>Logged in</strong></div>
+    <div class="success" id="success">
+      <div>
+        <h1>YOU DID IT 🎉</h1>
+        <p>Login successful. Welcome!</p>
+      </div>
+    </div>
 
-  <main id="main"></main>
+    <div class="loginBadge" id="loginBadge">
+      Status:
+      <strong>Logged in</strong>
+    </div>
 
-  <script>
-  (() => {
-    // --- Utility -----------------------------------------------------------
-    const rand = (a, b) => a + Math.random() * (b - a);
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    <main id="main"></main>
 
-    // --- Canvas Setup ------------------------------------------------------
-    const canvas = document.getElementById('scene');
-    const ctx = canvas.getContext('2d');
+    <script>
+      (() => {
+        // --- Utility -----------------------------------------------------------
+        const rand = (a, b) => a + Math.random() * (b - a);
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-    function fitCanvas() {
-      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      canvas.width = Math.floor(innerWidth * dpr);
-      canvas.height = Math.floor(innerHeight * dpr);
-      canvas.style.width = innerWidth + 'px';
-      canvas.style.height = innerHeight + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    fitCanvas();
-    addEventListener('resize', fitCanvas);
+        // --- Canvas Setup ------------------------------------------------------
+        const canvas = document.getElementById("scene");
+        const ctx = canvas.getContext("2d");
 
-    // --- Puzzle State ------------------------------------------------------
-    const colors = ['#ff6b6b','#ffd166','#06d6a0','#4cc9f0','#b892ff'];
-    const shapeKinds = ['circle','square','diamond','hex','star'];
+        function fitCanvas() {
+          const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+          canvas.width = Math.floor(innerWidth * dpr);
+          canvas.height = Math.floor(innerHeight * dpr);
+          canvas.style.width = innerWidth + "px";
+          canvas.style.height = innerHeight + "px";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        fitCanvas();
+        addEventListener("resize", fitCanvas);
 
-    const world = {
-      bodies: [],
-      slots: [],
-      gravity: {x: 0, y: 0},
-      restitution: 0.92,
-      started: false,
-      completed: false,
-    };
+        // --- Puzzle State ------------------------------------------------------
+        const colors = ["#ff6b6b", "#ffd166", "#06d6a0", "#4cc9f0", "#b892ff"];
+        const shapeKinds = ["circle", "square", "diamond", "hex", "star"];
 
-    function createBodies() {
-      world.bodies.length = 0;
-      const n = 5;
-      for (let i=0;i<n;i++) {
-        const kind = shapeKinds[i % shapeKinds.length];
-        const r = 28 + i*2; // visual size
-        const mass = r * 0.6;
-        world.bodies.push({
-          id: i,
-          kind,
-          x: rand(100, innerWidth-100),
-          y: rand(innerHeight*0.55, innerHeight*0.85),
-          vx: rand(-80,80),
-          vy: rand(-80,80),
-          r,
-          mass,
-          color: colors[i % colors.length],
-          grabbed: false,
-          grabDX: 0,
-          grabDY: 0,
+        const world = {
+          bodies: [],
+          slots: [],
+          gravity: { x: 0, y: 0 },
+          restitution: 0.92,
+          started: false,
+          completed: false,
+        };
+
+        function createBodies() {
+          world.bodies.length = 0;
+          const n = 5;
+          for (let i = 0; i < n; i++) {
+            const kind = shapeKinds[i % shapeKinds.length];
+            const r = 28 + i * 2; // visual size
+            const mass = r * 0.6;
+            world.bodies.push({
+              id: i,
+              kind,
+              x: rand(100, innerWidth - 100),
+              y: rand(innerHeight * 0.55, innerHeight * 0.85),
+              vx: rand(-80, 80),
+              vy: rand(-80, 80),
+              r,
+              mass,
+              color: colors[i % colors.length],
+              grabbed: false,
+              grabDX: 0,
+              grabDY: 0,
+            });
+          }
+        }
+
+        function createSlots() {
+          world.slots.length = 0;
+          const n = 5;
+          const y = innerHeight * 0.3;
+          const spacing = Math.min(160, (innerWidth - 200) / (n - 1));
+          const startX = innerWidth / 2 - (spacing * (n - 1)) / 2;
+          for (let i = 0; i < n; i++) {
+            world.slots.push({
+              x: startX + spacing * i,
+              y,
+              r: 36 + i * 2,
+              satisfiedBy: null, // body id
+              kind: shapeKinds[i % shapeKinds.length], // optional: type hint
+            });
+          }
+        }
+
+        function resetPuzzle() {
+          createBodies();
+          createSlots();
+          world.completed = false;
+          document.getElementById("success").classList.remove("show");
+          document.getElementById("loginBadge").classList.remove("show");
+        }
+
+        // --- Rendering ---------------------------------------------------------
+        function drawSoftCircle(x, y, r, fill, stroke, glow = 0) {
+          if (glow > 0) {
+            ctx.save();
+            ctx.shadowBlur = glow;
+            ctx.shadowColor = fill + "AA";
+          }
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          if (stroke) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = stroke;
+            ctx.stroke();
+          }
+          if (glow > 0) ctx.restore();
+        }
+
+        function drawShape(kind, x, y, size, color) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.fillStyle = color;
+          ctx.strokeStyle = "#0b0f20";
+          ctx.lineWidth = 2;
+          if (kind === "circle") {
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          } else if (kind === "square") {
+            const s = size * 1.7;
+            const r = 10;
+            roundRect(-s / 2, -s / 2, s, s, r);
+            ctx.fill();
+            ctx.stroke();
+          } else if (kind === "diamond") {
+            const s = size * 1.6;
+            ctx.beginPath();
+            ctx.moveTo(0, -s / 2);
+            ctx.lineTo(s / 2, 0);
+            ctx.lineTo(0, s / 2);
+            ctx.lineTo(-s / 2, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (kind === "hex") {
+            const s = size * 1.15;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+              const a = (Math.PI / 3) * i;
+              const px = Math.cos(a) * s;
+              const py = Math.sin(a) * s;
+              i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (kind === "star") {
+            const spikes = 5;
+            const outer = size * 1.3;
+            const inner = size * 0.6;
+            ctx.beginPath();
+            for (let i = 0; i < spikes * 2; i++) {
+              const rad = (Math.PI / spikes) * i;
+              const s = i % 2 ? inner : outer;
+              const px = Math.cos(rad) * s;
+              const py = Math.sin(rad) * s;
+              i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function roundRect(x, y, w, h, r) {
+          const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+          ctx.beginPath();
+          ctx.moveTo(x + rr, y);
+          ctx.arcTo(x + w, y, x + w, y + h, rr);
+          ctx.arcTo(x + w, y + h, x, y + h, rr);
+          ctx.arcTo(x, y + h, x, y, rr);
+          ctx.arcTo(x, y, x + w, y, rr);
+          ctx.closePath();
+        }
+
+        function render() {
+          ctx.clearRect(0, 0, innerWidth, innerHeight);
+          // Backdrop grid
+          ctx.save();
+          ctx.globalAlpha = 0.15;
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#2a3155";
+          const step = 60;
+          for (let x = 0; x < innerWidth; x += step) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, innerHeight);
+            ctx.stroke();
+          }
+          for (let y = 0; y < innerHeight; y += step) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(innerWidth, y);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // Slots
+          for (const s of world.slots) {
+            ctx.save();
+            const satisfied = s.satisfiedBy != null;
+            const glow = satisfied ? 24 : 8;
+            drawSoftCircle(s.x, s.y, s.r, satisfied ? "#183d28" : "#1a203a", "#2b3156", glow);
+            ctx.globalAlpha = 0.85;
+            drawShape(s.kind, s.x, s.y, 10, satisfied ? "#2cff9f" : "#aeb8ff");
+            ctx.restore();
+          }
+
+          // Bodies
+          for (const b of world.bodies) {
+            drawShape(b.kind, b.x, b.y, b.r * 0.6, b.color);
+          }
+
+          // Goal hint line
+          ctx.save();
+          ctx.strokeStyle = "#2b3156";
+          ctx.setLineDash([6, 6]);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (world.slots.length) {
+            ctx.moveTo(world.slots[0].x - 60, world.slots[0].y);
+            ctx.lineTo(world.slots.at(-1).x + 60, world.slots[0].y);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // --- Physics -----------------------------------------------------------
+        let lastTime = 0;
+        function step(ts) {
+          if (!world.started || world.completed) {
+            render();
+            requestAnimationFrame(step);
+            return;
+          }
+          if (!lastTime) lastTime = ts;
+          const dt = Math.min(1 / 30, (ts - lastTime) / 1000);
+          lastTime = ts;
+
+          // Integrate
+          for (const b of world.bodies) {
+            if (b.grabbed) continue;
+            b.vx += world.gravity.x * dt;
+            b.vy += world.gravity.y * dt;
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            // Damping
+            b.vx *= 0.995;
+            b.vy *= 0.995;
+          }
+
+          // Wall collisions
+          for (const b of world.bodies) {
+            const rad = b.r;
+            if (b.x < rad) {
+              b.x = rad;
+              b.vx = Math.abs(b.vx) * world.restitution;
+            }
+            if (b.x > innerWidth - rad) {
+              b.x = innerWidth - rad;
+              b.vx = -Math.abs(b.vx) * world.restitution;
+            }
+            if (b.y < rad) {
+              b.y = rad;
+              b.vy = Math.abs(b.vy) * world.restitution;
+            }
+            if (b.y > innerHeight - rad) {
+              b.y = innerHeight - rad;
+              b.vy = -Math.abs(b.vy) * world.restitution;
+            }
+          }
+
+          // Pairwise collisions (treat all shapes as soft-circles for physics)
+          for (let i = 0; i < world.bodies.length; i++) {
+            for (let j = i + 1; j < world.bodies.length; j++) {
+              const A = world.bodies[i],
+                B = world.bodies[j];
+              const dx = B.x - A.x,
+                dy = B.y - A.y;
+              const dist2 = dx * dx + dy * dy;
+              const minDist = A.r + B.r;
+              if (dist2 > 0 && dist2 < minDist * minDist) {
+                const dist = Math.sqrt(dist2) || 0.0001;
+                const nx = dx / dist,
+                  ny = dy / dist;
+                const overlap = minDist - dist;
+                // Separate
+                const invMassA = 1 / Math.max(1, A.mass),
+                  invMassB = 1 / Math.max(1, B.mass);
+                const sumInv = invMassA + invMassB;
+                const pushA = (invMassA / sumInv) * overlap;
+                const pushB = (invMassB / sumInv) * overlap;
+                A.x -= nx * pushA;
+                A.y -= ny * pushA;
+                B.x += nx * pushB;
+                B.y += ny * pushB;
+                // Reflect velocities
+                const relVx = B.vx - A.vx,
+                  relVy = B.vy - A.vy;
+                const sepVel = relVx * nx + relVy * ny;
+                if (sepVel < 0) {
+                  const impulse = (-(1 + world.restitution) * sepVel) / sumInv;
+                  const ix = impulse * nx,
+                    iy = impulse * ny;
+                  A.vx -= ix * invMassA;
+                  A.vy -= iy * invMassA;
+                  B.vx += ix * invMassB;
+                  B.vy += iy * invMassB;
+                }
+              }
+            }
+          }
+
+          // Slot satisfaction (order-independent, kind must match)
+          for (const s of world.slots) {
+            s.satisfiedBy = null;
+          }
+          for (const b of world.bodies) {
+            let best = null;
+            let bestD = Infinity;
+            for (const s of world.slots) {
+              if (s.satisfiedBy != null) continue; // already taken
+              if (s.kind !== b.kind) continue; // match by shape kind
+              const dx = b.x - s.x,
+                dy = b.y - s.y;
+              const d = Math.hypot(dx, dy);
+              if (d < s.r * 0.85 && d < bestD) {
+                best = s;
+                bestD = d;
+              }
+            }
+            if (best) {
+              best.satisfiedBy = b.id; // gentle magnet toward slot center
+              const spring = 8;
+              b.vx += (best.x - b.x) * spring * dt;
+              b.vy += (best.y - b.y) * spring * dt;
+            }
+          }
+
+          // Completion
+          const allGood = world.slots.every((s) => s.satisfiedBy != null);
+          if (allGood && !world.completed) {
+            world.completed = true;
+            loginSuccess();
+          }
+
+          render();
+          requestAnimationFrame(step);
+        }
+
+        requestAnimationFrame(step);
+
+        // --- Interaction -------------------------------------------------------
+        let pointer = { x: 0, y: 0, down: false, lastX: 0, lastY: 0, vx: 0, vy: 0 };
+
+        function getBodyAt(x, y) {
+          for (let i = world.bodies.length - 1; i >= 0; i--) {
+            const b = world.bodies[i];
+            if (Math.hypot(x - b.x, y - b.y) <= b.r * 1.1) return b;
+          }
+          return null;
+        }
+
+        const drag = { target: null };
+
+        function onDown(x, y, isShift) {
+          pointer.down = true;
+          pointer.x = x;
+          pointer.y = y;
+          pointer.lastX = x;
+          pointer.lastY = y;
+          pointer.vx = 0;
+          pointer.vy = 0;
+          const b = getBodyAt(x, y);
+          if (b) {
+            drag.target = b;
+            b.grabbed = true;
+            b.grabDX = x - b.x;
+            b.grabDY = y - b.y;
+            if (isShift) {
+              b.grabDX *= 0;
+              b.grabDY *= 0;
+            }
+          }
+        }
+        function onMove(x, y) {
+          pointer.vx = x - pointer.lastX;
+          pointer.vy = y - pointer.lastY;
+          pointer.lastX = x;
+          pointer.lastY = y;
+          pointer.x = x;
+          pointer.y = y;
+          if (drag.target) {
+            const b = drag.target;
+            const strength = 0.25;
+            b.x += (x - b.x - b.grabDX) * strength;
+            b.y += (y - b.y - b.grabDY) * strength;
+            b.vx = pointer.vx * 5;
+            b.vy = pointer.vy * 5;
+          }
+        }
+        function onUp() {
+          pointer.down = false;
+          if (drag.target) {
+            const b = drag.target;
+            b.grabbed = false; // keep current velocity
+            drag.target = null;
+          }
+        }
+
+        canvas.addEventListener("mousedown", (e) => onDown(e.offsetX, e.offsetY, e.shiftKey));
+        canvas.addEventListener("mousemove", (e) => onMove(e.offsetX, e.offsetY));
+        addEventListener("mouseup", onUp);
+
+        canvas.addEventListener(
+          "touchstart",
+          (e) => {
+            const t = e.changedTouches[0];
+            const rect = canvas.getBoundingClientRect();
+            onDown(t.clientX - rect.left, t.clientY - rect.top, e.shiftKey);
+            e.preventDefault();
+          },
+          { passive: false }
+        );
+        canvas.addEventListener(
+          "touchmove",
+          (e) => {
+            const t = e.changedTouches[0];
+            const rect = canvas.getBoundingClientRect();
+            onMove(t.clientX - rect.left, t.clientY - rect.top);
+            e.preventDefault();
+          },
+          { passive: false }
+        );
+        canvas.addEventListener(
+          "touchend",
+          (e) => {
+            onUp();
+            e.preventDefault();
+          },
+          { passive: false }
+        );
+
+        // Keyboard helpers
+        addEventListener("keydown", (e) => {
+          if (e.key === "r" || e.key === "R") {
+            resetPuzzle();
+          }
         });
-      }
-    }
 
-    function createSlots() {
-      world.slots.length = 0;
-      const n = 5;
-      const y = innerHeight*0.3;
-      const spacing = Math.min(160, (innerWidth-200)/(n-1));
-      const startX = innerWidth/2 - spacing*(n-1)/2;
-      for (let i=0;i<n;i++) {
-        world.slots.push({
-          x: startX + spacing*i,
-          y,
-          r: 36 + i*2,
-          satisfiedBy: null, // body id
-          kind: shapeKinds[i % shapeKinds.length], // optional: type hint
+        // --- UI & Flow ---------------------------------------------------------
+        function updateGoalPreview() {
+          const row = document.getElementById("goalPreview");
+          row.innerHTML = "";
+          for (let i = 0; i < 5; i++) {
+            const el = document.createElement("div");
+            el.className = "goalSlot ready";
+            el.style.borderColor = "#3a416f";
+            el.innerHTML = shapeSVG(shapeKinds[i], "#aeb8ff");
+            row.appendChild(el);
+          }
+        }
+
+        function shapeSVG(kind, color) {
+          const c = color || "#fff";
+          if (kind === "circle")
+            return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="10" fill="${c}"/></svg>`;
+          if (kind === "square")
+            return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="6" width="16" height="16" rx="4" fill="${c}"/></svg>`;
+          if (kind === "diamond")
+            return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 4 L24 14 L14 24 L4 14 Z" fill="${c}"/></svg>`;
+          if (kind === "hex")
+            return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 6 L18 6 L24 14 L18 22 L10 22 L4 14 Z" fill="${c}"/></svg>`;
+          if (kind === "star")
+            return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 4 L16.9 10.5 L24 11.2 L18.5 15.8 L20.3 23 L14 19.2 L7.7 23 L9.5 15.8 L4 11.2 L11.1 10.5 Z" fill="${c}"/></svg>`;
+          return "";
+        }
+
+        function loginSuccess() {
+          document.getElementById("success").classList.add("show");
+          document.getElementById("loginBadge").classList.add("show");
+          // Hide intro if still visible
+          document.getElementById("intro").style.display = "none";
+        }
+
+        // Buttons
+        document.getElementById("playBtn").addEventListener("click", () => {
+          world.started = true;
+          document.getElementById("intro").style.display = "none";
         });
-      }
-    }
+        document.getElementById("shuffleBtn").addEventListener("click", () => {
+          resetPuzzle();
+          updateGoalPreview();
+        });
+        document.getElementById("resetBtn").addEventListener("click", () => {
+          resetPuzzle();
+        });
 
-    function resetPuzzle() {
-      createBodies();
-      createSlots();
-      world.completed = false;
-      document.getElementById('success').classList.remove('show');
-      document.getElementById('loginBadge').classList.remove('show');
-    }
-
-    // --- Rendering ---------------------------------------------------------
-    function drawSoftCircle(x,y,r, fill, stroke, glow=0) {
-      if (glow>0) {
-        ctx.save();
-        ctx.shadowBlur = glow; ctx.shadowColor = fill + 'AA';
-      }
-      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fillStyle = fill; ctx.fill();
-      if (stroke) { ctx.lineWidth = 2; ctx.strokeStyle = stroke; ctx.stroke(); }
-      if (glow>0) ctx.restore();
-    }
-
-    function drawShape(kind, x, y, size, color) {
-      ctx.save();
-      ctx.translate(x,y);
-      ctx.fillStyle = color; ctx.strokeStyle = '#0b0f20'; ctx.lineWidth = 2;
-      if (kind === 'circle') {
-        ctx.beginPath(); ctx.arc(0,0,size,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      } else if (kind === 'square') {
-        const s = size*1.7; const r = 10;
-        roundRect(-s/2,-s/2,s,s,r); ctx.fill(); ctx.stroke();
-      } else if (kind === 'diamond') {
-        const s = size*1.6;
-        ctx.beginPath(); ctx.moveTo(0,-s/2); ctx.lineTo(s/2,0); ctx.lineTo(0,s/2); ctx.lineTo(-s/2,0); ctx.closePath(); ctx.fill(); ctx.stroke();
-      } else if (kind === 'hex') {
-        const s = size*1.15; ctx.beginPath();
-        for (let i=0;i<6;i++){ const a = Math.PI/3*i; const px = Math.cos(a)*s; const py=Math.sin(a)*s; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath(); ctx.fill(); ctx.stroke();
-      } else if (kind === 'star') {
-        const spikes=5; const outer=size*1.3; const inner=size*0.6; ctx.beginPath();
-        for (let i=0;i<spikes*2;i++){ const rad = (Math.PI/spikes)*i; const s = i%2?inner:outer; const px=Math.cos(rad)*s; const py=Math.sin(rad)*s; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    function roundRect(x,y,w,h,r){ const rr=Math.min(r, Math.abs(w)/2, Math.abs(h)/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
-
-    function render() {
-      ctx.clearRect(0,0,innerWidth,innerHeight);
-      // Backdrop grid
-      ctx.save();
-      ctx.globalAlpha = 0.15; ctx.lineWidth = 1; ctx.strokeStyle = '#2a3155';
-      const step = 60; for (let x=0;x<innerWidth;x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke(); }
-      for (let y=0;y<innerHeight;y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke(); }
-      ctx.restore();
-
-      // Slots
-      for (const s of world.slots) {
-        ctx.save();
-        const satisfied = s.sati
+        // Initialize
+        resetPuzzle();
+        updateGoalPreview();
+      })();
+    </script>
+  </body>
+</html>
