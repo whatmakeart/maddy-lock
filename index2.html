@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Physics Login Puzzle</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --fg: #e9ecf1;
+      --accent: #6ee7ff;
+      --good: #7CFC00;
+      --slot: #2a2f4a;
+      --slotGlow: #87a6ff88;
+    }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    canvas { width: 100vw; height: 100vh; display: block; background: radial-gradient(1000px 800px at 10% 10%, #171b33, #0f1220 60%); }
+
+    .hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 16px; padding: 10px 16px; pointer-events: none; }
+    .hud .pill { pointer-events: auto; background: #1b2038; border: 1px solid #2b3156; border-radius: 999px; padding: 8px 14px; box-shadow: 0 6px 22px #0007; }
+    .hud .title { font-weight: 700; letter-spacing: 0.3px; }
+    .btn { cursor: pointer; user-select: none; transition: transform .06s ease; }
+    .btn:active { transform: translateY(1px); }
+
+    .overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; }
+    .card { max-width: 900px; width: min(90vw, 980px); background: #11152aee; border: 1px solid #2b3156; box-shadow: 0 30px 100px #000e; border-radius: 20px; padding: 22px; backdrop-filter: blur(6px); }
+    .card h1 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 34px); }
+    .card p { opacity: .88; margin: 0 0 14px; line-height: 1.45; }
+    .goals { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .goalSlot { width: 54px; height: 54px; border-radius: 12px; background: var(--slot); border: 2px dashed #3a416f; outline: 4px solid transparent; box-shadow: inset 0 0 0 1px #00000055, 0 0 16px #0000; display: grid; place-items: center; }
+    .goalSlot.ready { outline-color: var(--slotGlow); box-shadow: 0 0 24px var(--slotGlow); }
+
+    .success { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: radial-gradient(1200px 800px at 50% 40%, #102532, #0a0d18 60%); }
+    .success.show { display: grid; }
+    .success h1 { font-size: clamp(40px, 12vw, 140px); margin: 0; line-height: .9; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 8px 30px #000a; }
+    .success p { font-size: clamp(16px, 2vw, 24px); opacity: .9; margin: 12px 0 0; }
+
+    .loginBadge { position: fixed; bottom: 12px; right: 12px; background: #0e1a2b; border: 1px solid #2b3156; padding: 10px 14px; border-radius: 12px; box-shadow: 0 10px 30px #0008; display: none; }
+    .loginBadge.show { display: block; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0b1322; border: 1px solid #2a3156; border-bottom-color: #1c2346; padding: 2px 6px; border-radius: 6px; font-size: .95em; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  </style>
+</head>
+<body>
+  <a class="sr-only" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <canvas id="scene" width="1280" height="720" aria-label="Physics puzzle canvas" role="img"></canvas>
+  </div>
+
+  <div class="hud">
+    <div class="pill title">Arrange the pieces into the glowing slots → they will bounce!</div>
+    <div class="pill btn" id="resetBtn" title="Reset (R)">Reset</div>
+    <div class="pill">Tip: drag with mouse / touch, fling to nudge. Hold <span class="kbd">Shift</span> for heavy pull.</div>
+  </div>
+
+  <div class="overlay" id="intro">
+    <div class="card">
+      <h1>Verify you're human with a tiny physics puzzle</h1>
+      <p>Drag the shapes so that each <strong>glowing slot</strong> is filled. Pieces collide and bounce off each other and the walls. When every slot is satisfied, you'll be logged in automatically.</p>
+      <div class="goals" id="goalPreview" aria-hidden="true"></div>
+      <p style="margin-top:12px; opacity:.8">Complete the arrangement shown above (order doesn't matter). Have fun!</p>
+      <div style="display:flex; gap:10px; margin-top:12px">
+        <button class="pill btn" id="playBtn">Start</button>
+        <button class="pill btn" id="shuffleBtn">Shuffle pieces</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="success" id="success">
+    <div>
+      <h1>YOU DID IT 🎉</h1>
+      <p>Login successful. Welcome!</p>
+    </div>
+  </div>
+
+  <div class="loginBadge" id="loginBadge">Status: <strong>Logged in</strong></div>
+
+  <main id="main"></main>
+
+  <script>
+  (() => {
+    // --- Utility -----------------------------------------------------------
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    // --- Canvas Setup ------------------------------------------------------
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+
+    function fitCanvas() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(innerWidth * dpr);
+      canvas.height = Math.floor(innerHeight * dpr);
+      canvas.style.width = innerWidth + 'px';
+      canvas.style.height = innerHeight + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    fitCanvas();
+    addEventListener('resize', fitCanvas);
+
+    // --- Puzzle State ------------------------------------------------------
+    const colors = ['#ff6b6b','#ffd166','#06d6a0','#4cc9f0','#b892ff'];
+    const shapeKinds = ['circle','square','diamond','hex','star'];
+
+    const world = {
+      bodies: [],
+      slots: [],
+      gravity: {x: 0, y: 0},
+      restitution: 0.92,
+      started: false,
+      completed: false,
+    };
+
+    function createBodies() {
+      world.bodies.length = 0;
+      const n = 5;
+      for (let i=0;i<n;i++) {
+        const kind = shapeKinds[i % shapeKinds.length];
+        const r = 28 + i*2; // visual size
+        const mass = r * 0.6;
+        world.bodies.push({
+          id: i,
+          kind,
+          x: rand(100, innerWidth-100),
+          y: rand(innerHeight*0.55, innerHeight*0.85),
+          vx: rand(-80,80),
+          vy: rand(-80,80),
+          r,
+          mass,
+          color: colors[i % colors.length],
+          grabbed: false,
+          grabDX: 0,
+          grabDY: 0,
+        });
+      }
+    }
+
+    function createSlots() {
+      world.slots.length = 0;
+      const n = 5;
+      const y = innerHeight*0.3;
+      const spacing = Math.min(160, (innerWidth-200)/(n-1));
+      const startX = innerWidth/2 - spacing*(n-1)/2;
+      for (let i=0;i<n;i++) {
+        world.slots.push({
+          x: startX + spacing*i,
+          y,
+          r: 36 + i*2,
+          satisfiedBy: null, // body id
+          kind: shapeKinds[i % shapeKinds.length], // optional: type hint
+        });
+      }
+    }
+
+    function resetPuzzle() {
+      createBodies();
+      createSlots();
+      world.completed = false;
+      document.getElementById('success').classList.remove('show');
+      document.getElementById('loginBadge').classList.remove('show');
+    }
+
+    // --- Rendering ---------------------------------------------------------
+    function drawSoftCircle(x,y,r, fill, stroke, glow=0) {
+      if (glow>0) {
+        ctx.save();
+        ctx.shadowBlur = glow; ctx.shadowColor = fill + 'AA';
+      }
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fillStyle = fill; ctx.fill();
+      if (stroke) { ctx.lineWidth = 2; ctx.strokeStyle = stroke; ctx.stroke(); }
+      if (glow>0) ctx.restore();
+    }
+
+    function drawShape(kind, x, y, size, color) {
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.fillStyle = color; ctx.strokeStyle = '#0b0f20'; ctx.lineWidth = 2;
+      if (kind === 'circle') {
+        ctx.beginPath(); ctx.arc(0,0,size,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      } else if (kind === 'square') {
+        const s = size*1.7; const r = 10;
+        roundRect(-s/2,-s/2,s,s,r); ctx.fill(); ctx.stroke();
+      } else if (kind === 'diamond') {
+        const s = size*1.6;
+        ctx.beginPath(); ctx.moveTo(0,-s/2); ctx.lineTo(s/2,0); ctx.lineTo(0,s/2); ctx.lineTo(-s/2,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else if (kind === 'hex') {
+        const s = size*1.15; ctx.beginPath();
+        for (let i=0;i<6;i++){ const a = Math.PI/3*i; const px = Math.cos(a)*s; const py=Math.sin(a)*s; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else if (kind === 'star') {
+        const spikes=5; const outer=size*1.3; const inner=size*0.6; ctx.beginPath();
+        for (let i=0;i<spikes*2;i++){ const rad = (Math.PI/spikes)*i; const s = i%2?inner:outer; const px=Math.cos(rad)*s; const py=Math.sin(rad)*s; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function roundRect(x,y,w,h,r){ const rr=Math.min(r, Math.abs(w)/2, Math.abs(h)/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
+
+    function render() {
+      ctx.clearRect(0,0,innerWidth,innerHeight);
+      // Backdrop grid
+      ctx.save();
+      ctx.globalAlpha = 0.15; ctx.lineWidth = 1; ctx.strokeStyle = '#2a3155';
+      const step = 60; for (let x=0;x<innerWidth;x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke(); }
+      for (let y=0;y<innerHeight;y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke(); }
+      ctx.restore();
+
+      // Slots
+      for (const s of world.slots) {
+        ctx.save();
+        const satisfied = s.sati

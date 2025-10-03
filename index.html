@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Physics Puzzle Lock</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Matter.js for physics simulation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <!-- Google Fonts for a nice look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet" />
+    <style>
+      /* Custom styles for the app */
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      /* Custom animation for the success message */
+      @keyframes scale-in {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .animate-scale-in {
+        animation: scale-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+      }
+      canvas {
+        touch-action: none; /* Prevents scrolling on mobile when dragging shapes */
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen overflow-hidden">
+    <!-- Container for the puzzle. Initially visible. -->
+    <div id="puzzle-container" class="w-full max-w-lg p-4 text-center transition-opacity duration-500">
+      <h1 class="text-4xl font-bold text-cyan-300 mb-2">Physics Lock</h1>
+      <p class="text-gray-400 mb-4">Drag the shapes into their matching outlines to unlock.</p>
+      <!-- The canvas for the physics simulation will be rendered inside this div -->
+      <div
+        id="canvas-container"
+        class="relative w-full aspect-[4/5] bg-gray-800 rounded-lg shadow-2xl mx-auto border-2 border-gray-700"></div>
+    </div>
+
+    <!-- Container for the success message. Initially hidden. -->
+    <div id="success-container" class="hidden text-center">
+      <h1 class="text-6xl md:text-9xl font-black text-green-400 animate-scale-in">You did it!</h1>
+    </div>
+
+    <script>
+      // --- DOM Elements ---
+      const puzzleContainer = document.getElementById("puzzle-container");
+      const successContainer = document.getElementById("success-container");
+      const canvasContainer = document.getElementById("canvas-container");
+
+      // --- Matter.js Modules ---
+      const { Engine, Render, Runner, Bodies, Composite, Mouse, MouseConstraint, Events, World } = Matter;
+
+      // --- Game Constants ---
+      const containerWidth = canvasContainer.clientWidth;
+      const containerHeight = canvasContainer.clientHeight;
+      const SHAPE_SIZE = containerWidth / 8; // Responsive shape size
+      const WALL_THICKNESS = 50;
+      const WIN_THRESHOLD = SHAPE_SIZE / 2; // How close a shape must be to its target to count
+
+      // --- Physics Engine Setup ---
+      // Create an engine
+      const engine = Engine.create();
+      const world = engine.world;
+      world.gravity.y = 0.8; // A bit of gravity to make it feel natural
+
+      // Create a renderer
+      const render = Render.create({
+        element: canvasContainer,
+        engine: engine,
+        options: {
+          width: containerWidth,
+          height: containerHeight,
+          wireframes: false, // Render solid shapes
+          background: "transparent", // Use the container's background color
+        },
+      });
+
+      // Create a runner
+      const runner = Runner.create();
+
+      // --- Create Game Objects ---
+
+      // 1. Walls to contain the shapes
+      const walls = [
+        // Top wall (invisible, just to keep shapes from flying out)
+        Bodies.rectangle(containerWidth / 2, -WALL_THICKNESS / 2, containerWidth, WALL_THICKNESS, { isStatic: true }),
+        // Bottom wall
+        Bodies.rectangle(containerWidth / 2, containerHeight + WALL_THICKNESS / 2, containerWidth, WALL_THICKNESS, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+        // Left wall
+        Bodies.rectangle(-WALL_THICKNESS / 2, containerHeight / 2, WALL_THICKNESS, containerHeight, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+        // Right wall
+        Bodies.rectangle(containerWidth + WALL_THICKNESS / 2, containerHeight / 2, WALL_THICKNESS, containerHeight, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+      ];
+      Composite.add(world, walls);
+
+      // 2. Draggable shapes
+      const commonOptions = {
+        restitution: 0.6, // Bounciness
+        friction: 0.3,
+      };
+
+      const shapes = [
+        Bodies.rectangle(containerWidth * 0.25, containerHeight * 0.2, SHAPE_SIZE, SHAPE_SIZE, {
+          ...commonOptions,
+          label: "square",
+          render: { fillStyle: "#4fd1c5" },
+        }),
+        Bodies.circle(containerWidth * 0.5, containerHeight * 0.15, SHAPE_SIZE / 2, {
+          ...commonOptions,
+          label: "circle",
+          render: { fillStyle: "#f6ad55" },
+        }),
+        Bodies.polygon(containerWidth * 0.75, containerHeight * 0.2, 5, SHAPE_SIZE / 1.8, {
+          ...commonOptions,
+          label: "pentagon",
+          render: { fillStyle: "#f687b3" },
+        }),
+      ];
+      Composite.add(world, shapes);
+
+      // 3. Target zones (static and non-colliding)
+      const targetCommonOptions = {
+        isStatic: true,
+        isSensor: true, // Doesn't collide with other bodies
+        render: {
+          fillStyle: "transparent",
+          strokeStyle: "#4a5568",
+          lineWidth: 3,
+        },
+      };
+
+      const targets = [
+        Bodies.rectangle(containerWidth * 0.25, containerHeight * 0.85, SHAPE_SIZE, SHAPE_SIZE, {
+          ...targetCommonOptions,
+          label: "square",
+        }),
+        Bodies.circle(containerWidth * 0.5, containerHeight * 0.85, SHAPE_SIZE / 2, {
+          ...targetCommonOptions,
+          label: "circle",
+        }),
+        Bodies.polygon(containerWidth * 0.75, containerHeight * 0.85, 5, SHAPE_SIZE / 1.8, {
+          ...targetCommonOptions,
+          label: "pentagon",
+        }),
+      ];
+      Composite.add(world, targets);
+
+      // 4. Draggable Obstacles
+      const obstacleOptions = {
+        restitution: 0.5,
+        friction: 0.4,
+        density: 0.005, // Make them feel a bit heavier
+        render: {
+          fillStyle: "#6b7280", // A neutral gray color
+        },
+      };
+
+      const obstacles = [
+        // A long horizontal bar
+        Bodies.rectangle(
+          containerWidth / 2,
+          containerHeight * 0.45,
+          containerWidth * 0.7,
+          SHAPE_SIZE / 2,
+          obstacleOptions
+        ),
+        // A smaller vertical bar
+        Bodies.rectangle(
+          containerWidth * 0.7,
+          containerHeight * 0.65,
+          SHAPE_SIZE / 2,
+          containerHeight * 0.25,
+          obstacleOptions
+        ),
+      ];
+      Composite.add(world, obstacles);
+
+      // --- Mouse Controls ---
+      const mouse = Mouse.create(render.canvas);
+      const mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+          stiffness: 0.2,
+          render: {
+            visible: false, // Don't show the line from mouse to shape
+          },
+        },
+      });
+      Composite.add(world, mouseConstraint);
+      // Keep the renderer's mouse object in sync with the engine's
+      render.mouse = mouse;
+
+      // --- Win Condition Logic ---
+      function checkWinCondition() {
+        let solvedCount = 0;
+
+        shapes.forEach((shape) => {
+          // Find the target that matches this shape's label
+          const target = targets.find((t) => t.label === shape.label);
+          if (target) {
+            const distance = Math.sqrt(
+              Math.pow(shape.position.x - target.position.x, 2) + Math.pow(shape.position.y - target.position.y, 2)
+            );
+
+            // If the shape is close enough to its target
+            if (distance < WIN_THRESHOLD) {
+              // Provide visual feedback by changing target color
+              target.render.strokeStyle = "#48bb78"; // Green
+              solvedCount++;
+            } else {
+              target.render.strokeStyle = "#4a5568"; // Reset to gray
+            }
+          }
+        });
+
+        // If all shapes are in place, trigger the win
+        if (solvedCount === shapes.length) {
+          onWin();
+        }
+      }
+
+      function onWin() {
+        // Stop checking for the win to prevent multiple triggers
+        Events.off(engine, "afterUpdate", checkWinCondition);
+
+        // Clean up the physics simulation
+        World.clear(world);
+        Engine.clear(engine);
+        Render.stop(render);
+        Runner.stop(runner);
+        render.canvas.remove(); // Remove the canvas element
+
+        // Show the success message
+        puzzleContainer.style.opacity = "0";
+        setTimeout(() => {
+          puzzleContainer.classList.add("hidden");
+          successContainer.classList.remove("hidden");
+        }, 500); // Wait for fade-out transition
+      }
+
+      // --- Start the Simulation ---
+      // Listen for updates to the engine and check for win condition
+      Events.on(engine, "afterUpdate", checkWinCondition);
+
+      // Run the renderer and the engine
+      Render.run(render);
+      Runner.run(runner, engine);
+
+      // --- Responsive Canvas ---
+      // Handle window resizing to keep the simulation scaled correctly
+      window.addEventListener("resize", () => {
+        const newWidth = canvasContainer.clientWidth;
+        const newHeight = canvasContainer.clientHeight;
+
+        // Update render canvas size
+        render.canvas.width = newWidth;
+        render.canvas.height = newHeight;
+        render.options.width = newWidth;
+        render.options.height = newHeight;
+
+        // This is a simple rescale, for a more robust solution,
+        // you might need to reposition bodies. But this handles most cases.
+        Matter.Render.setPixelRatio(render, window.devicePixelRatio);
+      });
+    </script>
+  </body>
+</html>
