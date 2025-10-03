@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Physics Puzzle Lock</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Matter.js for physics simulation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <!-- Google Fonts for a nice look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet" />
+    <style>
+      /* Custom styles for the app */
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      /* Custom animation for the success message */
+      @keyframes scale-in {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .animate-scale-in {
+        animation: scale-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+      }
+      canvas {
+        touch-action: none; /* Prevents scrolling on mobile when dragging shapes */
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen overflow-hidden">
+    <!-- Container for the puzzle. Initially visible. -->
+    <div id="puzzle-container" class="w-full max-w-lg p-4 text-center transition-opacity duration-500">
+      <h1 class="text-4xl font-bold text-cyan-300 mb-2">Physics Lock</h1>
+      <p class="text-gray-400 mb-4">Drag the shapes into their matching outlines to unlock.</p>
+      <!-- The canvas for the physics simulation will be rendered inside this div -->
+      <div
+        id="canvas-container"
+        class="relative w-full aspect-[4/5] bg-gray-800 rounded-lg shadow-2xl mx-auto border-2 border-gray-700"></div>
+    </div>
+
+    <!-- Container for the success message. Initially hidden. -->
+    <div id="success-container" class="hidden text-center">
+      <h1 class="text-6xl md:text-9xl font-black text-green-400 animate-scale-in">You did it!</h1>
+    </div>
+
+    <script>
+      // --- DOM Elements ---
+      const puzzleContainer = document.getElementById("puzzle-container");
+      const successContainer = document.getElementById("success-container");
+      const canvasContainer = document.getElementById("canvas-container");
+
+      // --- Matter.js Modules ---
+      const { Engine, Render, Runner, Bodies, Composite, Mouse, MouseConstraint, Events, World } = Matter;
+
+      // --- Game Constants ---
+      const containerWidth = canvasContainer.clientWidth;
+      const containerHeight = canvasContainer.clientHeight;
+      const SHAPE_SIZE = containerWidth / 8; // Responsive shape size
+      const WALL_THICKNESS = 50;
+      const WIN_THRESHOLD = SHAPE_SIZE / 2; // How close a shape must be to its target to count
+
+      // --- Physics Engine Setup ---
+      const engine = Engine.create();
+      const world = engine.world;
+      world.gravity.y = 0.8;
+
+      const render = Render.create({
+        element: canvasContainer,
+        engine: engine,
+        options: {
+          width: containerWidth,
+          height: containerHeight,
+          wireframes: false,
+          background: "transparent",
+        },
+      });
+
+      const runner = Runner.create();
+
+      // --- Game Objects ---
+      let shapes = [];
+      let targets = [];
+
+      // 1. Walls to contain the shapes
+      const walls = [
+        Bodies.rectangle(containerWidth / 2, -WALL_THICKNESS / 2, containerWidth, WALL_THICKNESS, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+        Bodies.rectangle(containerWidth / 2, containerHeight + WALL_THICKNESS / 2, containerWidth, WALL_THICKNESS, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+        Bodies.rectangle(-WALL_THICKNESS / 2, containerHeight / 2, WALL_THICKNESS, containerHeight, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+        Bodies.rectangle(containerWidth + WALL_THICKNESS / 2, containerHeight / 2, WALL_THICKNESS, containerHeight, {
+          isStatic: true,
+          render: { visible: false },
+        }),
+      ];
+      Composite.add(world, walls);
+
+      // --- Randomized Generation ---
+
+      // A library of possible shapes to generate
+      const shapeDefinitions = [
+        {
+          label: "square",
+          color: "#4fd1c5",
+          createBody: (x, y, size, options) => Bodies.rectangle(x, y, size, size, options),
+        },
+        {
+          label: "circle",
+          color: "#f6ad55",
+          createBody: (x, y, size, options) => Bodies.circle(x, y, size / 2, options),
+        },
+        {
+          label: "pentagon",
+          color: "#f687b3",
+          createBody: (x, y, size, options) => Bodies.polygon(x, y, 5, size / 1.8, options),
+        },
+        {
+          label: "triangle",
+          color: "#9f7aea",
+          createBody: (x, y, size, options) => Bodies.polygon(x, y, 3, size / 1.5, options),
+        },
+        {
+          label: "hexagon",
+          color: "#63b3ed",
+          createBody: (x, y, size, options) => Bodies.polygon(x, y, 6, size / 1.7, options),
+        },
+      ];
+
+      // Function to shuffle an array (Fisher-Yates shuffle)
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      function createRandomPuzzle() {
+        shuffle(shapeDefinitions);
+        const selectedShapes = shapeDefinitions.slice(0, 3);
+        const positions = [0.25, 0.5, 0.75];
+        shuffle(positions);
+
+        selectedShapes.forEach((def, index) => {
+          const xPos = containerWidth * positions[index];
+
+          // Create draggable shape
+          const shape = def.createBody(xPos, containerHeight * 0.2, SHAPE_SIZE, {
+            restitution: 0.6,
+            friction: 0.3,
+            label: def.label,
+            render: { fillStyle: def.color },
+          });
+          shapes.push(shape);
+
+          // Create target zone
+          const target = def.createBody(xPos, containerHeight * 0.85, SHAPE_SIZE, {
+            isStatic: true,
+            isSensor: true,
+            label: def.label,
+            render: {
+              fillStyle: "transparent",
+              strokeStyle: "#4a5568",
+              lineWidth: 3,
+            },
+          });
+          targets.push(target);
+        });
+
+        Composite.add(world, [...shapes, ...targets]);
+      }
+
+      function createRandomObstacles() {
+        const numObstacles = Math.floor(Math.random() * 3) + 3; // 3 to 5 obstacles
+        const newObstacles = [];
+
+        for (let i = 0; i < numObstacles; i++) {
+          const x = containerWidth * (0.2 + Math.random() * 0.6);
+          const y = containerHeight * (0.4 + Math.random() * 0.3);
+
+          let obstacle;
+          const typeRoll = Math.random();
+          let options = { restitution: 0.5, friction: 0.4 };
+
+          if (typeRoll < 0.15) {
+            // 15% chance for a heavy obstacle
+            options.density = 0.03; // Much heavier
+            options.render = { fillStyle: "#e53e3e" }; // Red
+          } else if (typeRoll > 0.85) {
+            // 15% chance for a light obstacle
+            options.density = 0.0001; // Feather-light
+            options.render = { fillStyle: "#48bb78" }; // Green
+          } else {
+            // Normal obstacle
+            options.density = 0.005;
+            options.render = { fillStyle: "#6b7280" }; // Gray
+          }
+
+          const shapeRoll = Math.random();
+          if (shapeRoll > 0.5) {
+            // Rectangle
+            const width = SHAPE_SIZE * (1 + Math.random());
+            const height = SHAPE_SIZE * (0.5 + Math.random() * 0.5);
+            obstacle = Bodies.rectangle(x, y, width, height, options);
+          } else {
+            // Circle
+            const radius = SHAPE_SIZE * (0.3 + Math.random() * 0.4);
+            obstacle = Bodies.circle(x, y, radius, options);
+          }
+
+          Matter.Body.setAngle(obstacle, Math.random() * Math.PI);
+          newObstacles.push(obstacle);
+        }
+        Composite.add(world, newObstacles);
+      }
+
+      // Generate the puzzle on load
+      createRandomPuzzle();
+      createRandomObstacles();
+
+      // --- Mouse Controls ---
+      const mouse = Mouse.create(render.canvas);
+      const mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+          stiffness: 0.2,
+          render: { visible: false },
+        },
+      });
+      Composite.add(world, mouseConstraint);
+      render.mouse = mouse;
+
+      // --- Win Condition Logic ---
+      function checkWinCondition() {
+        let solvedCount = 0;
+        shapes.forEach((shape) => {
+          const target = targets.find((t) => t.label === shape.label);
+          if (target) {
+            const distance = Math.sqrt(
+              Math.pow(shape.position.x - target.position.x, 2) + Math.pow(shape.position.y - target.position.y, 2)
+            );
+            if (distance < WIN_THRESHOLD) {
+              target.render.strokeStyle = "#48bb78"; // Green
+              solvedCount++;
+            } else {
+              target.render.strokeStyle = "#4a5568"; // Reset to gray
+            }
+          }
+        });
+
+        if (solvedCount === shapes.length) {
+          onWin();
+        }
+      }
+
+      function onWin() {
+        Events.off(engine, "afterUpdate", checkWinCondition);
+        World.clear(world);
+        Engine.clear(engine);
+        Render.stop(render);
+        Runner.stop(runner);
+        render.canvas.remove();
+
+        puzzleContainer.style.opacity = "0";
+        setTimeout(() => {
+          puzzleContainer.classList.add("hidden");
+          successContainer.classList.remove("hidden");
+        }, 500);
+      }
+
+      // --- Start the Simulation ---
+      Events.on(engine, "afterUpdate", checkWinCondition);
+      Render.run(render);
+      Runner.run(runner, engine);
+
+      // --- Responsive Canvas ---
+      window.addEventListener("resize", () => {
+        const newWidth = canvasContainer.clientWidth;
+        const newHeight = canvasContainer.clientHeight;
+
+        render.canvas.width = newWidth;
+        render.canvas.height = newHeight;
+        render.options.width = newWidth;
+        render.options.height = newHeight;
+
+        Matter.Render.setPixelRatio(render, window.devicePixelRatio);
+      });
+    </script>
+  </body>
+</html>
